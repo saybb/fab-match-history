@@ -6,35 +6,69 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
-# Load your CSV data
-file_path = 'match_history.csv'  # Replace with your CSV file path
-data = pd.read_csv(file_path)
+file_path = 'data/match_history.csv'  # TODO read this from stdin
 
-# Concatenate 'Player 1' and 'Player 2' columns and find the most frequent player
-all_players = pd.concat([data['Player 1'], data['Player 2']])
-user_name = all_players.value_counts().idxmax()  # Most frequent name in all matches
-total_matches = len(data)
+# loads and parses match history data from scraped csv
+def load_match_history(filename=file_path):
+    data = pd.read_csv(filename)
 
-# Determine opponent names and whether the user won each match
-data['Opponent'] = data.apply(lambda row: row['Player 2'] if row['Player 1'] == user_name else row['Player 1'], axis=1)
-data['User_Win'] = ((data['Player 1'] == user_name) & data['Result'].str.contains('Player 1 Win')) | \
-                   ((data['Player 2'] == user_name) & data['Result'].str.contains('Player 2 Win'))
+    data["Event Date"] = pd.to_datetime(data["Event Date"].map(fix_fab_date))
+
+    # replace users with their GEM ID
+    data["GEM 1"] = data["Player 1"].apply(lambda x: pd.Series(str(x).split('(')[-1][:-1]))
+    data["GEM 2"] = data["Player 2"].apply(lambda x: pd.Series(str(x).split('(')[-1][:-1]))
+    
+    # Concatenate 'Player 1' and 'Player 2' columns and find the most frequent player
+    gem_ids = pd.concat([data['GEM 1'], data['GEM 2']])
+    player_id = gem_ids.value_counts().idxmax()  # Most frequent name in all matches
+    
+    # Determine opponent's most recent names and whether the user won each match
+    data['Opponent'] = data.apply(lambda row: row['GEM 2'] if row['GEM 1'] == player_id else row['GEM 1'], axis=1)
+    data['Opponent Name'] = data.apply(lambda row: row['Player 2'] if row['GEM 1'] == player_id else row['Player 1'], axis=1)
+
+    # THIS IS EXTREMELY INEFFICIENT - MUST TIDY UP
+    data['Opponent'] = data["Opponent"].apply(lambda x: get_most_recent_name_by_gem_id(data, str(x)))
+
+    data['User_Win'] = ((data['GEM 1'] == player_id) & data['Result'].str.contains('Player 1 Win')) | \
+                    ((data['GEM 2'] == player_id) & data['Result'].str.contains('Player 2 Win'))
+
+    data = data[["Opponent", "User_Win", "Rated", "Round", "Event Date"]]
+    return data
+
+# fix the shitty fab dates so they can be parsed
+def fix_fab_date(date):
+    date = date.replace("Jan.", "January")
+    date = date.replace("Feb.", "February")
+    date = date.replace("Aug.", "August")
+    date = date.replace("Sept.", "September")
+    date = date.replace("Oct.", "October")
+    date = date.replace("Nov.", "November")
+    date = date.replace("Dec.", "December")
+
+    date = "".join(date.split(",")[:-1])
+
+    return date
+
+# fetches the most recently used name from the match history for a gem id
+def get_most_recent_name_by_gem_id(data, id): 
+    data_for_name = data[(data["Opponent"] == id)]
+    row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].min()].iloc[0]
+    return row["Opponent Name"]
+
+match_history = load_match_history()
+
+total_matches = len(match_history)
+
 
 # Total winrate
-total_winrate = data['User_Win'].mean()
-
-# Winrate as Player 1 and Player 2
-data['User_Is_Player1'] = data['Player 1'] == user_name
-data['User_Is_Player2'] = data['Player 2'] == user_name
-winrate_player1 = data[data['User_Is_Player1']]['User_Win'].mean()
-winrate_player2 = data[data['User_Is_Player2']]['User_Win'].mean()
+total_winrate = match_history['User_Win'].mean()
 
 # Group data by opponent and calculate win rate
-opponent_win_rate = data.groupby('Opponent')['User_Win'].mean().reset_index()
+opponent_win_rate = match_history.groupby('Opponent')['User_Win'].mean().reset_index()
 opponent_win_rate.rename(columns={'User_Win': 'Win Rate'}, inplace=True)
 
 # Calculate match count, win count, and loss count against each opponent
-opponent_stats = data.groupby('Opponent').agg(
+opponent_stats = match_history.groupby('Opponent').agg(
     Match_Count=('Opponent', 'size'),
     Win_Count=('User_Win', lambda x: x.sum()),  # Count the wins
     Loss_Count=('User_Win', lambda x: (1-x).sum())  # Count the losses
@@ -50,7 +84,7 @@ top_5_opponents = opponent_stats.nlargest(5, 'Match_Count')
 number_opponents = len(opponent_stats)
 
 # Group data by round and calculate win rate
-round_win_rate = data.groupby('Round')['User_Win'].mean().reset_index()
+round_win_rate = match_history.groupby('Round')['User_Win'].mean().reset_index()
 round_win_rate.rename(columns={'User_Win': 'Win Rate'}, inplace=True)
 
 round_win_rate['Win Rate'] = round_win_rate['Win Rate'] * 100
@@ -165,9 +199,9 @@ app.layout = html.Div([
 def update_graph(sort_by_value, rated_value):
     # Filter by rated status if not 'all'
     if rated_value != 'all':
-        filtered_data = data[data['Rated'] == rated_value]
+        filtered_data = match_history[match_history['Rated'] == rated_value]
     else:
-        filtered_data = data.copy()
+        filtered_data = match_history.copy()
 
     # Group by opponent and calculate win rate and match count
     opponent_stats_filtered = filtered_data.groupby('Opponent').agg(
@@ -217,7 +251,7 @@ def update_output(n_clicks, value):
         return 'Enter an opponent name and click submit'
 
     # Replace NaN values in 'Opponent' column and filter data
-    filtered_data = data[data['Opponent'].fillna('').str.contains(value, case=False)]
+    filtered_data = match_history[match_history['Opponent'].fillna('').str.contains(value, case=False)]
 
     if filtered_data.empty:
         return 'No matches found for this opponent'
@@ -242,23 +276,19 @@ def update_output(n_clicks, value):
 )
 def update_stats(rating_filter):
     if rating_filter == 'all':
-        filtered_data = data
+        filtered_data = match_history
     elif rating_filter == 'True':
-        filtered_data = data[data['Rated'] == True]
+        filtered_data = match_history[match_history['Rated'] == True]
     else:
-        filtered_data = data[data['Rated'] == False]
+        filtered_data = match_history[match_history['Rated'] == False]
 
     total_matches = len(filtered_data)
     total_winrate = filtered_data['User_Win'].mean()
-    winrate_player1 = filtered_data[filtered_data['User_Is_Player1']]['User_Win'].mean()
-    winrate_player2 = filtered_data[filtered_data['User_Is_Player2']]['User_Win'].mean()
     number_opponents = len(filtered_data.groupby('Opponent'))
 
     return html.Div([
         html.H3(f'Total Matches: {total_matches}'),
         html.H3(f'Total Winrate: {total_winrate:.2%}'),
-        html.H3(f'Winrate as Player 1: {winrate_player1:.2%}'),
-        html.H3(f'Winrate as Player 2: {winrate_player2:.2%}'),
         html.H3(f'Number of different Opponents: {number_opponents}')
     ])
 
