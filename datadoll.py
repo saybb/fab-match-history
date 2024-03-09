@@ -52,7 +52,7 @@ def fix_fab_date(date):
 # fetches the most recently used name from the match history for a gem id
 def get_most_recent_name_by_gem_id(data, id): 
     data_for_name = data[(data["Opponent"] == id)]
-    row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].min()].iloc[0]
+    row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].max()].iloc[0]
     return row["Opponent Name"]
 
 match_history = load_match_history()
