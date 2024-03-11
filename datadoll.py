@@ -1,15 +1,25 @@
+import argparse
+
 import dash
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import html
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
-file_path = 'match_history.csv'  # TODO read this from stdin
+import os
+import webbrowser
+
+# It hurts me not to put this in the __main__ function, but there are too many dependencies in how the rest of the script is structured that it'd take a major overhaul
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--file", default="match_history.csv",
+                    help="the path to your FaB history as scraped by GreaseMonkey/TamperMonkey: please see README for instructions on how to obtain this")
+args = parser.parse_args()
 
 # loads and parses match history data from scraped csv
-def load_match_history(filename=file_path):
+def load_match_history(filename=args.file):
     data = pd.read_csv(filename)
 
     data["Event Date"] = pd.to_datetime(data["Event Date"].map(fix_fab_date))
@@ -308,4 +318,10 @@ def update_stats(rating_filter):
 
 # Run the app
 if __name__ == '__main__':
+    # The reloader has not yet run - open the browser
+    # https://stackoverflow.com/questions/54235347/open-browser-automatically-when-python-code-is-executed
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        webbrowser.open_new('http://127.0.0.1:8050/')
+
+    # Start the Flask App
     app.run_server(debug=False, host='0.0.0.0', port=8050)
