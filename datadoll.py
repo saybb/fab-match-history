@@ -12,14 +12,12 @@ import plotly.graph_objs as go
 import os
 import webbrowser
 
-# It hurts me not to put this in the __main__ function, but there are too many dependencies in how the rest of the script is structured that it'd take a major overhaul
-parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--file", default="match_history.csv",
-                    help="the path to your FaB history as scraped by GreaseMonkey/TamperMonkey: please see README for instructions on how to obtain this")
-args = parser.parse_args()
+# Initialize the Dash app
+app = dash.Dash(__name__)
 
 # loads and parses match history data from scraped csv
-def load_match_history(filename=args.file):
+# def load_match_history(filename=args.file):
+def load_match_history(filename="match_history.csv"):
     data = pd.read_csv(filename)
 
     data["Event Date"] = pd.to_datetime(data["Event Date"].map(fix_fab_date))
@@ -78,65 +76,65 @@ What filters do we want?
  - # games for opponents / visualisations (exclude 1of games)
  - rated vs unrated vs all
 """
-# Initialize the Dash app
-app = dash.Dash(__name__)
 
-# Define the layout of the app
-app.layout = html.Div([
-    dcc.Store(id='match_history', data=load_match_history().to_dict("records")),
-    dcc.Store(id="match_history_filtered"),
+def init_layout(app, filename):
+    # Define the layout of the app
+    app.layout = html.Div([
+        dcc.Store(id='match_history', data=load_match_history(filename).to_dict("records")),
+        dcc.Store(id="match_history_filtered"),
 
-    html.H1('FaB History Analysis'),
-    html.Div('Interactive visualization of matchup history.'),
+        html.H1('FaB History Analysis'),
+        html.Div('Interactive visualization of matchup history.'),
 
-    html.H2("Filters"),
-    dcc.RadioItems(
-        id='rated_filter',
-        options=[
-            {'label': 'All', 'value': 'all'},
-            {'label': 'Rated', 'value': 'True'},
-            {'label': 'Unrated', 'value': 'False'}
-        ],
-        value='all',  # Default value
-        labelStyle={'display': 'inline-block'}
-    ),
+        html.H2("Filters"),
+        dcc.RadioItems(
+            id='rated_filter',
+            options=[
+                {'label': 'All', 'value': 'all'},
+                {'label': 'Rated', 'value': 'True'},
+                {'label': 'Unrated', 'value': 'False'}
+            ],
+            value='all',  # Default value
+            labelStyle={'display': 'inline-block'}
+        ),
 
-    ### General Stats
-    html.H2("General Stats"),
-    html.Div(id='stats_output'),  # Div to display updated stats
+        ### General Stats
+        html.H2("General Stats"),
+        html.Div(id='stats_output'),  # Div to display updated stats
 
-    ### Opponent Stats
-    html.H2("Opponent Stats"),
+        ### Opponent Stats
+        html.H2("Opponent Stats"),
 
-    html.H3("Search for an opponent:"),
-    html.Div([
-        dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
-        html.Button('Submit', id='opponent_name_submit'),
-        html.Div(id='opponent_name_output')
-    ]),
+        html.H3("Search for an opponent:"),
+        html.Div([
+            dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
+            html.Button('Submit', id='opponent_name_submit'),
+            html.Div(id='opponent_name_output')
+        ]),
 
-    
-    html.H3("Win Rates for Opponents"),
-    dcc.Dropdown(
-        id='sort_by_dropdown',
-        options=[
-            {'label': 'Name - Ascending', 'value': 'Name_asc'},
-            {'label': 'Name - Descending', 'value': 'Name_desc'},
-            {'label': 'Win Rate - Ascending', 'value': 'Win Rate_asc'},
-            {'label': 'Win Rate - Descending', 'value': 'Win Rate_desc'}
-        ],
-        value='Name_asc'
-    ),
-    dcc.Graph(id='fig_win_rates'),
+        
+        html.H3("Win Rates for Opponents"),
+        dcc.Dropdown(
+            id='sort_by_dropdown',
+            options=[
+                {'label': 'Name - Ascending', 'value': 'Name_asc'},
+                {'label': 'Name - Descending', 'value': 'Name_desc'},
+                {'label': 'Win Rate - Ascending', 'value': 'Win Rate_asc'},
+                {'label': 'Win Rate - Descending', 'value': 'Win Rate_desc'}
+            ],
+            value='Name_asc'
+        ),
+        dcc.Graph(id='fig_win_rates'),
 
-    html.H3("Most Played Opponents"),
-    dcc.Graph(id='fig_top_opponents'),
+        html.H3("Most Played Opponents"),
+        dcc.Graph(id='fig_top_opponents'),
 
-    ### Round Stats
-    html.H2("Round Stats"),
-    dcc.Graph(id='fig_round_win_rate')
+        ### Round Stats
+        html.H2("Round Stats"),
+        dcc.Graph(id='fig_round_win_rate')
+    ])
 
-])
+
 
 @app.callback(
         Output('match_history_filtered', 'data'),
@@ -199,11 +197,10 @@ def update_opponent_search(match_history, n_clicks, value):
     ).reset_index()
 
     # Formatting the output
-    results = []
-    for _, row in opponent_stats.iterrows():
-        results.append(f"{row['Opponent']}: {row['Match_Count']} matches, {row['Win_Rate']:.2%} win rate")
-
-    return html.Ul([html.Li(opponent) for opponent in results])
+    return html.Ul([
+        html.Li(f"{row['Opponent']}: {row['Match_Count']} matches, {row['Win_Rate']:.2%} win rate") 
+        for _, row in opponent_stats.iterrows()
+    ])
 
 
 
@@ -324,6 +321,15 @@ def create_figure_round_win_rate(match_history):
 
 # Run the app
 if __name__ == '__main__':
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file", default="match_history.csv",
+                        help="the path to your FaB history as scraped by GreaseMonkey/TamperMonkey: please see README for instructions on how to obtain this")
+    args = parser.parse_args()
+
+    # Initialise the Dash layout using the provided data file
+    init_layout(app, args.file)
+
     # The reloader has not yet run - open the browser
     # https://stackoverflow.com/questions/54235347/open-browser-automatically-when-python-code-is-executed
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
