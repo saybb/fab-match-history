@@ -85,21 +85,25 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     dcc.Store(id='match_history', data=load_match_history().to_dict("records")),
     dcc.Store(id="match_history_filtered"),
+    dcc.Store(id="opponent_history"),
 
     html.H1('FaB History Analysis'),
     html.Div('Interactive visualization of matchup history.'),
 
-    html.H2("Filters"),
-    dcc.RadioItems(
-        id='rated_filter',
-        options=[
-            {'label': 'All', 'value': 'all'},
-            {'label': 'Rated', 'value': 'True'},
-            {'label': 'Unrated', 'value': 'False'}
-        ],
-        value='all',  # Default value
-        labelStyle={'display': 'inline-block'}
-    ),
+    html.H2("Global Filters"),
+    html.Div([
+        html.Div("Filter By Whether Match is Rated"),
+        dcc.RadioItems(
+            id='rated_filter',
+            options=[
+                {'label': 'All', 'value': 'all'},
+                {'label': 'Rated', 'value': 'True'},
+                {'label': 'Unrated', 'value': 'False'}
+            ],
+            value='all',  # Default value
+            labelStyle={'display': 'inline-block'}
+        ),
+    ]),
 
     ### General Stats
     html.H2("General Stats"),
@@ -107,11 +111,17 @@ app.layout = html.Div([
 
     ### Opponent Stats
     html.H2("Opponent Stats"),
+    html.H3("Opponent Filters"),
+    html.Div([
+        html.Div("Min. Games"),
+        dcc.Input(id='min_games_filter', type='number', min=1, step=1, value='1'),
+    ]),
 
     html.H3("Search for an opponent:"),
     html.Div([
+        html.Label("Search for an opponent: "),
         dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
-        html.Button('Submit', id='opponent_name_submit'),
+        html.Br(),html.Br(),
         html.Div(id='opponent_name_output')
     ]),
 
@@ -138,6 +148,8 @@ app.layout = html.Div([
 
 ])
 
+# This callback just updates the global filtered data based on the existing
+# filters provided by the users
 @app.callback(
         Output('match_history_filtered', 'data'),
         [Input('match_history', 'data'), Input('rated_filter', 'value')]
@@ -154,7 +166,27 @@ def update_match_history_filtered(match_history, rated_filter):
 
     return filtered_data.to_dict("records")
 
+@app.callback(
+        Output('opponent_history', 'data'),
+        [Input('match_history_filtered', 'data'), Input('min_games_filter', 'value')]
+)
+def update_opponent_history(match_history, min_games):
+    match_history = pd.DataFrame(match_history)
+    
+    min_games = int(min_games) if min_games else 1
+    
+    # set up opponent data
+    opponent_stats = match_history.groupby('Opponent').agg(
+        Match_Count=('Opponent', 'size'),                
+        Win_Count=('User_Win', lambda x: x.sum()),       # Count the wins
+        Loss_Count=('User_Win', lambda x: (1-x).sum()),  # Count the losses
+    ).reset_index()
+    opponent_stats['Win_Rate'] = opponent_stats['Win_Count'] / opponent_stats['Match_Count']
 
+    # apply min games filter
+    opponent_stats = opponent_stats[opponent_stats['Match_Count'] >= min_games]
+
+    return opponent_stats.to_dict("records")
 
 @app.callback(
     Output('stats_output', 'children'),
@@ -170,72 +202,55 @@ def update_general_stats(match_history):
     return html.Div([
         html.H3(f'Total Matches: {total_matches}'),
         html.H3(f'Total Winrate: {total_winrate:.2%}'),
-        html.H3(f'Number of different Opponents: {number_opponents}')
+        html.H3(f'Number of Different Opponents: {number_opponents}')
     ])
-
 
 
 @app.callback(
     Output('opponent_name_output', 'children'),
-    [Input('match_history_filtered', 'data'), Input('opponent_name_submit', 'n_clicks')],
-    [State('opponent_name_input', 'value')]
+    [Input('opponent_history', 'data'), Input('opponent_name_input', 'value')]
 )
-def update_opponent_search(match_history, n_clicks, value):
-    match_history = pd.DataFrame(match_history)
+def update_opponent_search(opponent_history, query):
+    opponent_history = pd.DataFrame(opponent_history)
 
-    if n_clicks is None or value is None:
-        return 'Enter an opponent name and click submit'
+    if query is None or query == "":
+        return 'Enter an opponent name or GEM ID and click submit.'
 
-    # Replace NaN values in 'Opponent' column and filter data
-    filtered_data = match_history[match_history['Opponent'].fillna('').str.contains(value, case=False)]
+    filtered_data = opponent_history[opponent_history["Opponent"].str.contains(query, case=False)]
 
     if filtered_data.empty:
-        return 'No matches found for this opponent'
-
-    # Group by 'Opponent' and calculate win rate and count for each
-    opponent_stats = filtered_data.groupby('Opponent').agg(
-        Match_Count=('Opponent', 'size'),
-        Win_Rate=('User_Win', 'mean')
-    ).reset_index()
+        return 'No opponents matching this query.'
 
     # Formatting the output
     results = []
-    for _, row in opponent_stats.iterrows():
+    for _, row in filtered_data.iterrows():
         results.append(f"{row['Opponent']}: {row['Match_Count']} matches, {row['Win_Rate']:.2%} win rate")
 
     return html.Ul([html.Li(opponent) for opponent in results])
 
-
-
 # THIS SHOULD JUST BE A TABLE????????????
 @app.callback(
     Output('fig_win_rates', 'figure'),
-    [Input('match_history_filtered', 'data'), Input('sort_by_dropdown', 'value')]
+    [Input('opponent_history', 'data'), Input('sort_by_dropdown', 'value')]
 )
-def update_graph(match_history, sort_by_value):
-    match_history = pd.DataFrame(match_history)
-
-    # Group by opponent and calculate win rate and match count
-    opponent_stats_filtered = match_history.groupby('Opponent').agg(
-        Match_Count=('Opponent', 'size'),
-        Win_Rate=('User_Win', 'mean')
-    ).reset_index()
+def update_graph(opponent_history, sort_by_value):
+    opponent_history = pd.DataFrame(opponent_history)
 
     # Convert 'Win_Rate' to percentage
-    opponent_stats_filtered['Win_Rate'] *= 100
+    opponent_history['Win_Rate'] *= 100
 
     # Determine sorting
     sort_by, order = sort_by_value.split('_')
     ascending = order == 'asc'
 
     if sort_by == 'Name':
-        opponent_stats_filtered.sort_values(by='Opponent', ascending=ascending, inplace=True)
+        opponent_history.sort_values(by='Opponent', ascending=ascending, inplace=True)
     elif sort_by == 'Win Rate':
-        opponent_stats_filtered.sort_values(by='Win_Rate', ascending=ascending, inplace=True)
+        opponent_history.sort_values(by='Win_Rate', ascending=ascending, inplace=True)
 
     # Create the figure
     figure = px.bar(
-        opponent_stats_filtered,
+        opponent_history,
         x='Opponent',
         y='Win_Rate',
         title='Win Rate Against Each Opponent'
@@ -248,7 +263,7 @@ def update_graph(match_history, sort_by_value):
     figure.update_layout(yaxis_title="Win Rate (%)")
 
     # Add customdata for hover info
-    figure.update_traces(customdata=opponent_stats_filtered['Match_Count'])
+    figure.update_traces(customdata=opponent_history['Match_Count'])
 
     return figure
 
@@ -256,22 +271,12 @@ def update_graph(match_history, sort_by_value):
 
 @app.callback(
         Output('fig_top_opponents', 'figure'),
-        [Input('match_history_filtered', 'data')]
+        [Input('opponent_history', 'data')]
 )
-def create_figure_top_opponents(match_history, n=5):
-    match_history = pd.DataFrame(match_history)
+def create_figure_top_opponents(opponent_history, n=5):
+    opponent_history = pd.DataFrame(opponent_history)
 
-    # set up opponent data
-    opponent_stats = match_history.groupby('Opponent').agg(
-        Match_Count=('Opponent', 'size'),                
-        Win_Count=('User_Win', lambda x: x.sum()),       # Count the wins
-        Loss_Count=('User_Win', lambda x: (1-x).sum()),  # Count the losses
-    ).reset_index()
-
-    # Calculate win rate
-    opponent_stats['Win Rate'] = opponent_stats['Win_Count'] / opponent_stats['Match_Count']
-
-    top_opponents = opponent_stats.nlargest(n, 'Match_Count')
+    top_opponents = opponent_history.nlargest(n, 'Match_Count')
 
     # Assuming top_5_opponents is already sorted by 'Match_Count' descending
     fig = go.Figure()
