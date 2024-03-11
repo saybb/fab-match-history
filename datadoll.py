@@ -55,30 +55,39 @@ def get_most_recent_name_by_gem_id(data, id):
     row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].max()].iloc[0]
     return row["Opponent Name"]
 
+#### Script Here ####
+
+"""
+What data do we want?
+ - opponent data (win rates, matches played, visualisations)
+ - round data
+ - time-based data? (w/r per month, year)
+ 
+What filters do we want?
+ - date filter (all time, past year, past 6mths, past month)
+ - # games for opponents / visualisations (exclude 1of games)
+ - rated vs unrated vs all
+"""
+
+# set up global data
 match_history = load_match_history()
 
-total_matches = len(match_history)
-
-
-# Total winrate
-total_winrate = match_history['User_Win'].mean()
-
-# Group data by opponent and calculate win rate
-opponent_win_rate = match_history.groupby('Opponent')['User_Win'].mean().reset_index()
-opponent_win_rate.rename(columns={'User_Win': 'Win Rate'}, inplace=True)
-
-# Calculate match count, win count, and loss count against each opponent
+# set up opponent data
 opponent_stats = match_history.groupby('Opponent').agg(
-    Match_Count=('Opponent', 'size'),
-    Win_Count=('User_Win', lambda x: x.sum()),  # Count the wins
-    Loss_Count=('User_Win', lambda x: (1-x).sum())  # Count the losses
+    Match_Count=('Opponent', 'size'),                
+    Win_Count=('User_Win', lambda x: x.sum()),       # Count the wins
+    Loss_Count=('User_Win', lambda x: (1-x).sum()),  # Count the losses
 ).reset_index()
 
-# Calculate win rate for later use
-opponent_stats['Win_Rate'] = opponent_stats['Win_Count'] / opponent_stats['Match_Count']
+# Calculate win rate
+opponent_stats['Win Rate'] = opponent_stats['Win_Count'] / opponent_stats['Match_Count']
+
+# Extracting Key Values
+total_matches = len(match_history)
+total_winrate = match_history['User_Win'].mean()
 
 # Sort opponents by win rate
-opponent_win_rate_sorted = opponent_win_rate.sort_values('Win Rate', ascending=True)
+opponent_win_rate_sorted = opponent_stats.sort_values('Win Rate', ascending=True)
 
 top_5_opponents = opponent_stats.nlargest(5, 'Match_Count')
 number_opponents = len(opponent_stats)
@@ -140,6 +149,8 @@ app.layout = html.Div([
     html.H1('FaB History Analysis'),
     html.Div('Interactive visualization of matchup history.'),
 
+    ### General Stats
+    html.H2("General Stats"),
     html.Div([
         dcc.RadioItems(
             id='rating_filter',
@@ -154,13 +165,13 @@ app.layout = html.Div([
         html.Div(id='stats_output')  # Div to display updated stats
     ]),
 
+    ### Opponent Stats
+    html.H2("Opponent Stats"),
     html.Div([
         dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
         html.Button('Submit', id='opponent_name_submit'),
         html.Div(id='opponent_name_output')
     ]),
-
-
     dcc.Dropdown(
         id='sort_by_dropdown',
         options=[
@@ -187,6 +198,8 @@ app.layout = html.Div([
 
     dcc.Graph(id='top-opponents-graph', figure=fig),
 
+    ### Round Stats
+    html.H2("Round Stats"),
     dcc.Graph(figure=round_win_rate_figure)
 
 ])
