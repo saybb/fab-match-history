@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
-file_path = 'data/match_history.csv'  # TODO read this from stdin
+file_path = 'match_history.csv'  # TODO read this from stdin
 
 # loads and parses match history data from scraped csv
 def load_match_history(filename=file_path):
