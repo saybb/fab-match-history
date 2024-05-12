@@ -21,26 +21,13 @@ def load_match_history(filename="match_history.csv"):
     data = pd.read_csv(filename)
 
     data["Event Date"] = pd.to_datetime(data["Event Date"].map(fix_fab_date))
-
-    # replace users with their GEM ID
-    data["GEM 1"] = data["Player 1"].apply(lambda x: pd.Series(str(x).split('(')[-1][:-1]))
-    data["GEM 2"] = data["Player 2"].apply(lambda x: pd.Series(str(x).split('(')[-1][:-1]))
     
-    # Concatenate 'Player 1' and 'Player 2' columns and find the most frequent player
-    gem_ids = pd.concat([data['GEM 1'], data['GEM 2']])
-    player_id = gem_ids.value_counts().idxmax()  # Most frequent name in all matches
-    
-    # Determine opponent's most recent names and whether the user won each match
-    data['Opponent'] = data.apply(lambda row: row['GEM 2'] if row['GEM 1'] == player_id else row['GEM 1'], axis=1)
-    data['Opponent Name'] = data.apply(lambda row: row['Player 2'] if row['GEM 1'] == player_id else row['Player 1'], axis=1)
-
     # THIS IS EXTREMELY INEFFICIENT - MUST TIDY UP
-    data['Opponent'] = data["Opponent"].apply(lambda x: get_most_recent_name_by_gem_id(data, str(x)))
+    data["Opponent"] = data["Opponent"].apply(lambda x: get_most_recent_name_by_gem_id(data, str(x)))
 
-    data['User_Win'] = ((data['GEM 1'] == player_id) & data['Result'].str.contains('Player 1 Win')) | \
-                    ((data['GEM 2'] == player_id) & data['Result'].str.contains('Player 2 Win'))
+    data["Result"] = data["Result"].apply(lambda x: False if x == "Loss" else True)
 
-    data = data[["Opponent", "User_Win", "Rated", "Round", "Event Date"]]
+    data = data[["Opponent", "Result", "Rated", "Round", "Event Date"]]
     return data
 
 # fix the shitty fab dates so they can be parsed
@@ -61,7 +48,7 @@ def fix_fab_date(date):
 def get_most_recent_name_by_gem_id(data, id): 
     data_for_name = data[(data["Opponent"] == id)]
     row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].max()].iloc[0]
-    return row["Opponent Name"]
+    return row["Opponent"]
 
 #### Script Here ####
 
@@ -176,8 +163,8 @@ def update_opponent_history(match_history, min_games):
     # set up opponent data
     opponent_stats = match_history.groupby('Opponent').agg(
         Match_Count=('Opponent', 'size'),                
-        Win_Count=('User_Win', lambda x: x.sum()),       # Count the wins
-        Loss_Count=('User_Win', lambda x: (1-x).sum()),  # Count the losses
+        Win_Count=('Result', lambda x: x.sum()),       # Count the wins
+        Loss_Count=('Result', lambda x: (1-x).sum()),  # Count the losses
     ).reset_index()
     opponent_stats['Win_Rate'] = opponent_stats['Win_Count'] / opponent_stats['Match_Count']
 
@@ -194,7 +181,7 @@ def update_general_stats(match_history):
     match_history = pd.DataFrame(match_history)
 
     total_matches = len(match_history)
-    total_winrate = match_history['User_Win'].mean()
+    total_winrate = match_history['Result'].mean()
     number_opponents = len(match_history.groupby('Opponent'))
 
     return html.Div([
@@ -310,8 +297,8 @@ def create_figure_round_win_rate(match_history):
     match_history = pd.DataFrame(match_history)
 
     # Group data by round and calculate win rate
-    round_win_rate = match_history.groupby('Round')['User_Win'].mean().reset_index()
-    round_win_rate.rename(columns={'User_Win': 'Win Rate'}, inplace=True)
+    round_win_rate = match_history.groupby('Round')['Result'].mean().reset_index()
+    round_win_rate.rename(columns={'Result': 'Win Rate'}, inplace=True)
 
     round_win_rate['Win Rate'] = round_win_rate['Win Rate'] * 100
     round_win_rate_figure = px.bar(round_win_rate, x='Round', y='Win Rate', title='Win Rate per Round')
