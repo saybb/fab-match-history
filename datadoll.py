@@ -4,6 +4,7 @@ import dash
 from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import html
+from dash import dash_table
 
 import pandas as pd
 import plotly.express as px
@@ -116,18 +117,27 @@ def init_layout(app, filename):
 
                 
                 html.H3("Win Rates for Opponents"),
-                dcc.Dropdown(
-                    id='sort_by_dropdown',
-                    options=[
-                        {'label': 'Name - Ascending', 'value': 'Name_asc'},
-                        {'label': 'Name - Descending', 'value': 'Name_desc'},
-                        {'label': 'Win Rate - Ascending', 'value': 'Win Rate_asc'},
-                        {'label': 'Win Rate - Descending', 'value': 'Win Rate_desc'}
-                    ],
-                    value='Name_asc'
-                ),html.Br(),
-                dcc.Graph(id='fig_win_rates'),
-
+                dash_table.DataTable(
+                    id='table_opponents', 
+                    data=[],
+                    page_action='none',
+                    sort_action="native",       # enables data to be sorted per-column by user or not ('none')
+                    sort_mode="single",         # sort across 'multi' or 'single' columns
+                    selected_columns=[],        # ids of columns that user selects
+                    selected_rows=[],           # indices of rows that user selects
+                    fixed_rows={'headers': True},
+                    style_data={
+                        'whiteSpace': 'normal',
+                        'height': 'auto',
+                    },
+                    style_cell={'textAlign':'right','minWidth': 50, 'maxWidth': 100, 'width': 70,'font_size': '1rem'},
+                    style_cell_conditional=[
+                        {
+                            'if': {'column_id': 'Opponent'},
+                            'textAlign': 'left'
+                        }
+                    ]
+                ),
                 html.H3("Most Played Opponents"),
                 dcc.Graph(id='fig_top_opponents'),
             ], className="statbox"),
@@ -223,43 +233,19 @@ def update_opponent_search(opponent_history, query):
 
 # THIS SHOULD JUST BE A TABLE????????????
 @app.callback(
-    Output('fig_win_rates', 'figure'),
-    [Input('opponent_history', 'data'), Input('sort_by_dropdown', 'value')]
+    [Output('table_opponents', 'data'), Output('table_opponents', 'columns')],
+    Input('opponent_history', 'data')
 )
-def update_graph(opponent_history, sort_by_value):
+def update_graph(opponent_history):
     opponent_history = pd.DataFrame(opponent_history)
 
-    # Convert 'Win_Rate' to percentage
-    opponent_history['Win_Rate'] *= 100
-
-    # Determine sorting
-    sort_by, order = sort_by_value.split('_')
-    ascending = order == 'asc'
-
-    if sort_by == 'Name':
-        opponent_history.sort_values(by='Opponent', ascending=ascending, inplace=True)
-    elif sort_by == 'Win Rate':
-        opponent_history.sort_values(by='Win_Rate', ascending=ascending, inplace=True)
-
-    # Create the figure
-    figure = px.bar(
-        opponent_history,
-        x='Opponent',
-        y='Win_Rate',
-        title='Win Rate Against Each Opponent'
-    )
-
-    # Update hover template to show percentage and match count
-    figure.update_traces(
-        hovertemplate='Opponent: %{x}<br>Win Rate: %{y:.2f}%<br>Match Count: %{customdata}'
-    )
-    figure.update_layout(yaxis_title="Win Rate (%)")
-
-    # Add customdata for hover info
-    figure.update_traces(customdata=opponent_history['Match_Count'])
-
-    return figure
-
+    return opponent_history.to_dict('records'), [
+        {"name": "Opponent", "id":"Opponent"},
+        {"name": "Matches Played", "id":"Match_Count"},
+        {"name": "Matches Won", "id":"Win_Count"},
+        {"name": "Matches Lost", "id":"Loss_Count"},
+        {"name": "Win Rate (Percentage)", "id":"Win_Rate", "type":'numeric', "format":dash_table.FormatTemplate.percentage(2)}
+        ]
 
 
 @app.callback(

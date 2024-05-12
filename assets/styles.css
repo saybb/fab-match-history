@@ -60,7 +60,7 @@ hr {
     align-items: center;
 
     color: var(--color-gold);
-    z-index: 100;
+    z-index: 1000;
 }
 
 .title {
