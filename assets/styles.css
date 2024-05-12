@@ -1,0 +1,94 @@
+:root {
+    --color-black: #000;
+    --color-white: #fff;
+    --color-dark: #222;
+    --color-light: #fff;
+    --color-grey-dark: #3a3a3a;
+    --color-grey-light: #5a574b;
+    --color-tiny-grey: #d4d4d4;
+    --color-gold-dark: #4e3c1d;
+    --color-gold-dim: #805f32;
+    --color-gold: #c19a57;
+    --color-gold-light: #e4c293;
+    --color-blood-red: #873229;
+    --color-blood-red-light: #b44337;
+    --color-pitch-1: #c40202;
+    --color-pitch-2: #e0c013;
+    --color-pitch-3: #2075d8;
+    --color-win: #add6a6;
+    --color-theme-bg: var(--color-light);
+    --color-theme-fg: var(--color-dark)
+}
+
+body {
+    background-color: #000;
+    background-image: url("/assets/paper60ed865.jpeg");
+    color: var(--color-theme-fg);
+    font-family: capitolium-2,serif;
+
+    margin:0;
+    padding:0;
+}
+
+h1 {
+    font-weight: 500;
+}
+
+h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1.2rem
+}
+
+h4 {
+    font-size: 1rem
+}
+
+hr {
+    border-top: 2px solid var(--color-gold) 
+}
+
+.header {
+    background-color: #000;
+    box-shadow: 0 5px 10px 0 rgba(0,0,0,.75);
+    position: sticky;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 1rem;
+
+    display: flex;
+    align-items: center;
+
+    color: var(--color-gold);
+    z-index: 100;
+}
+
+.title {
+    margin: 0rem 0.5rem;
+    font-size: 1.5rem;
+}
+
+.subtitle {
+    margin: 0rem 0.5rem;
+    font-size: 1rem;
+}
+
+.filters {
+    margin-left: auto;
+    margin-right: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.content {
+    width: 70%;
+    margin: 0 auto;
+}
+.statbox {
+    background-color: var(--color-gold-light);
+    border: 2px solid var(--color-gold);
+    border-radius: 1px;
+
+    padding: 0.5rem;
+    margin-top: 1rem;
+}

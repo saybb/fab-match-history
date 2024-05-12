@@ -71,64 +71,73 @@ def init_layout(app, filename):
         dcc.Store(id="match_history_filtered"),
         dcc.Store(id="opponent_history"),
 
-        html.H1('FaB History Analysis'),
-        html.Div('Interactive visualization of matchup history.'),
-
-        html.H2("Global Filters"),
-        html.Div([
-            html.Div("Filter By Whether Match is Rated"),
-            dcc.RadioItems(
-                id='rated_filter',
-                options=[
-                    {'label': 'All', 'value': 'all'},
-                    {'label': 'Rated', 'value': 'True'},
-                    {'label': 'Unrated', 'value': 'False'}
-                ],
-                value='all',  # Default value
-                labelStyle={'display': 'inline-block'}
-            ),
+        html.Div(className="header", children=[
+            html.H3('FaB History Analysis', className="title"),
+            html.H4('Interactive visualization of matchup history.', className="subtitle"),
+            html.Div([
+                html.Div("Rated Matches?"),
+                dcc.RadioItems(
+                    id='rated_filter',
+                    options=[
+                        {'label': 'All', 'value': 'all'},
+                        {'label': 'Rated', 'value': 'True'},
+                        {'label': 'Unrated', 'value': 'False'}
+                    ],
+                    value='all',  # Default value
+                ),
+            ], className="filters"),
         ]),
 
-        ### General Stats
-        html.H2("General Stats"),
-        html.Div(id='stats_output'),  # Div to display updated stats
+        html.Div(className="content", children=[
 
-        ### Opponent Stats
-        html.H2("Opponent Stats"),
-        html.H3("Opponent Filters"),
-        html.Div([
-            html.Div("Min. Games"),
-            dcc.Input(id='min_games_filter', type='number', min=1, step=1, value='1'),
-        ]),
+            ### General Stats
+            html.Div([
+                html.H2("General Stats"),
+                html.Hr(),
+                html.Div(id='stats_output'),  # Div to display updated stats
+            ], className="statbox"),
+            
+            ### Opponent Stats
+            html.Div([
+                html.H2("Opponent Stats"),
+                html.H3("Opponent Filters"),
+                html.Div([
+                    html.Div("Min. Games"),
+                    dcc.Input(id='min_games_filter', type='number', min=1, step=1, value='1'),
+                ]),
 
-        html.H3("Search for an opponent:"),
-        html.Div([
-            html.Label("Search for an opponent: "),
-            dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
-            html.Br(),html.Br(),
-            html.Div(id='opponent_name_output')
-        ]),
+                html.H3("Search for an opponent:"),
+                html.Div([
+                    html.Label("Search for an opponent: "),
+                    dcc.Input(id='opponent_name_input', type='text', placeholder='Enter opponent name'),
+                    html.Br(),html.Br(),
+                    html.Div(id='opponent_name_output')
+                ]),
 
-        
-        html.H3("Win Rates for Opponents"),
-        dcc.Dropdown(
-            id='sort_by_dropdown',
-            options=[
-                {'label': 'Name - Ascending', 'value': 'Name_asc'},
-                {'label': 'Name - Descending', 'value': 'Name_desc'},
-                {'label': 'Win Rate - Ascending', 'value': 'Win Rate_asc'},
-                {'label': 'Win Rate - Descending', 'value': 'Win Rate_desc'}
-            ],
-            value='Name_asc'
-        ),
-        dcc.Graph(id='fig_win_rates'),
+                
+                html.H3("Win Rates for Opponents"),
+                dcc.Dropdown(
+                    id='sort_by_dropdown',
+                    options=[
+                        {'label': 'Name - Ascending', 'value': 'Name_asc'},
+                        {'label': 'Name - Descending', 'value': 'Name_desc'},
+                        {'label': 'Win Rate - Ascending', 'value': 'Win Rate_asc'},
+                        {'label': 'Win Rate - Descending', 'value': 'Win Rate_desc'}
+                    ],
+                    value='Name_asc'
+                ),html.Br(),
+                dcc.Graph(id='fig_win_rates'),
 
-        html.H3("Most Played Opponents"),
-        dcc.Graph(id='fig_top_opponents'),
-
-        ### Round Stats
-        html.H2("Round Stats"),
-        dcc.Graph(id='fig_round_win_rate')
+                html.H3("Most Played Opponents"),
+                dcc.Graph(id='fig_top_opponents'),
+            ], className="statbox"),
+            
+            ### Round Stats
+            html.Div([
+                html.H2("Round Stats"),
+                dcc.Graph(id='fig_round_win_rate')
+            ], className="statbox"),     
+        ])
     ])
 
 
@@ -185,9 +194,9 @@ def update_general_stats(match_history):
     number_opponents = len(match_history.groupby('Opponent'))
 
     return html.Div([
-        html.H3(f'Total Matches: {total_matches}'),
-        html.H3(f'Total Winrate: {total_winrate:.2%}'),
-        html.H3(f'Number of Different Opponents: {number_opponents}')
+        html.P(f'Total Matches: {total_matches}'),
+        html.P(f'Total Winrate: {total_winrate:.2%}'),
+        html.P(f'Number of Different Opponents: {number_opponents}')
     ])
 
 
