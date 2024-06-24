@@ -1,7 +1,10 @@
-# FaB-History-Scraper
+# FaB Match History
 
 ## About
-`FaB-History-Scraper` is a userscript for GreaseMonkey/TamperMonkey designed to scrape a user's personal matchup history from [https://gem.fabtcg.com/profile/player/](https://gem.fabtcg.com/profile/player/). This script automates the process of gathering match history data, which can be useful for analysis, tracking progress, or simply archiving your match records.
+FaB Match History is a fork of [https://github.com/AltarisV/FaB-History-Scraper] focused on improving the data visualisation and analysis. Credit for the original code and the scraper goes to the original creater - I have just made some modifications primarily to the Python code that allows you to visualise your match result history in browser. 
+Below is the original README.
+
+---
 
 ## Prerequisites
 To use the Scraper, you need:
