@@ -3,7 +3,7 @@
 // @version      1.0
 // @description  Scrape match history data from a player's own page
 // @author       Leon Schüßler
-// @match        https://gem.fabtcg.com/profile/player/*
+// @match        https://gem.fabtcg.com/profile/history/*
 // @grant        none
 // ==/UserScript==
 
@@ -17,35 +17,42 @@
         const currentPageLink = document.querySelector('.pagination-pages li.page-item.active');
         const currentPageIndex = currentPageLink ? parseInt(currentPageLink.textContent.trim()) : 1;
 
-        const events = document.querySelectorAll('.card.mb-3');
+        const events = document.querySelectorAll('.event');
 
         events.forEach(event => {
-            const eventDetails = event.querySelector('.card-body');
-            if (eventDetails) {
-                let eventName, eventDate, rated;
-                const eventRows = eventDetails.querySelectorAll('tbody tr');
-                eventRows.forEach(row => {
-                    const thText = row.querySelector('th')?.textContent.trim();
-                    const tdText = row.querySelector('td')?.textContent.trim();
-                    if (thText && tdText) {
-                        if (thText === 'Event Nickname') {
-                            eventName = tdText;
-                        } else if (thText === 'Date') {
-                            eventDate = tdText;
-                        } else if (thText === 'Rated?') {
-                            rated = tdText;
-                        }
-                    }
-                });
+            let eventName, eventDate, eventType, eventFormat, rated;
+            
+            // get relevant metadata about the event
+            eventName = event.querySelector('.event__title')?.textContent.trim();
 
-                const eventMatches = eventDetails.querySelectorAll('.block-table tbody tr:not(:first-child)');
-                const eventResults = {
-                    eventName: eventName || 'Event name not found',
-                    eventDate: eventDate || 'Event date not found',
-                    rated: rated || 'Unknown', // Default to 'Unknown' if not found
-                    matches: []
-                };
+            const eventMeta = event.querySelectorAll('.event__meta-item');
+            /**
+             * 0: date
+             * 1: store
+             * 2: event type
+             * 3: event format
+             * 4: xp modifier
+             * 5: is rated?
+             */
+            if (eventMeta) {
+                eventDate = eventMeta[0].querySelector('span')?.textContent.trim()
+                eventType = eventMeta[2].querySelector('span')?.textContent.trim()
+                eventFormat = eventMeta[3].querySelector('span')?.textContent.trim()
+                rated = eventMeta[5].querySelector('span')?.textContent.trim()
+            }
 
+            const eventResults = {
+                eventName: eventName || 'Event name not found',
+                eventDate: eventDate || 'Event date not found',
+                eventType: eventType || 'Event type not found',
+                eventFormat: eventFormat || 'Event format not found',
+                rated: rated || 'Unknown', // Default to 'Unknown' if not found
+                matches: []
+            };
+            
+            // get match data
+            const eventMatches = event.querySelectorAll('div.block-table table tbody tr:not(:first-child)');
+            if (eventMatches) {
                 eventMatches.forEach(match => {
                     const round = match.querySelector('td:nth-child(1)').textContent.trim();
                     const opponent = match.querySelector('td:nth-child(2)').textContent.trim();
@@ -53,10 +60,9 @@
                     eventResults.matches.push({ round, opponent, result });
                 });
 
-                allEventData.push(eventResults);
-            } else {
-                console.log('Event details not found.');
             }
+
+            allEventData.push(eventResults);
         });
 
         console.log(`Scraped data from page ${currentPageIndex}.`);
@@ -85,12 +91,14 @@
 
     function saveDataToCSV() {
         // Convert allEventData to CSV format
-        const csvRows = ['Event Name,Event Date,Rated,Round,Opponent,Result'];
+        const csvRows = ['Event Name,Event Date,Event Type, Event Format,Rated,Round,Opponent,Result'];
         allEventData.forEach(event => {
             event.matches.forEach(match => {
                 const row = [
                     `"${event.eventName}"`,
                     `"${event.eventDate}"`,
+                    `"${event.eventType}"`,
+                    `"${event.eventFormat}"`,
                     `"${event.rated}"`,
                     match.round,
                     `"${match.opponent}"`,

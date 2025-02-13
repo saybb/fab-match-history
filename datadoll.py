@@ -24,31 +24,23 @@ def load_match_history(filename="match_history.csv"):
     data["Event Date"] = pd.to_datetime(data["Event Date"].map(fix_fab_date))
     
     # THIS IS EXTREMELY INEFFICIENT - MUST TIDY UP
-    data["Opponent"] = data["Opponent"].apply(lambda x: get_most_recent_name_by_gem_id(data, str(x)))
+    data["Opponent"] = data["Opponent"].apply(lambda x: get_most_recent_name_by_gem_id(data, get_gem_id_from_name(x)))
 
     data["Result"] = data["Result"].apply(lambda x: False if x == "Loss" else True)
 
     data = data[["Opponent", "Result", "Rated", "Round", "Event Date"]]
     return data
 
-# fix the shitty fab dates so they can be parsed
 def fix_fab_date(date):
-    date = date.replace("Jan.", "January")
-    date = date.replace("Feb.", "February")
-    date = date.replace("Aug.", "August")
-    date = date.replace("Sept.", "September")
-    date = date.replace("Oct.", "October")
-    date = date.replace("Nov.", "November")
-    date = date.replace("Dec.", "December")
+    return  "".join(date.split(",")[:-1])
 
-    date = "".join(date.split(",")[:-1])
-
-    return date
+def get_gem_id_from_name(name):
+    return name.split("(")[-1][:-1]
 
 # fetches the most recently used name from the match history for a gem id
 def get_most_recent_name_by_gem_id(data, id): 
-    data_for_name = data[(data["Opponent"] == id)]
-    row = data_for_name[data_for_name["Event Date"] == data_for_name["Event Date"].max()].iloc[0]
+    data_filtered = data[data["Opponent"].apply(lambda x: get_gem_id_from_name(x) == id)]
+    row = data_filtered[data_filtered["Event Date"] == data_filtered["Event Date"].max()].iloc[0]
     return row["Opponent"]
 
 #### Script Here ####
@@ -164,9 +156,9 @@ def update_match_history_filtered(match_history, rated_filter):
     if rated_filter == 'all':
         filtered_data = match_history
     elif rated_filter == 'True':
-        filtered_data = match_history[match_history['Rated'] == True]
+        filtered_data = match_history[match_history['Rated'] == "Rated"]
     else:
-        filtered_data = match_history[match_history['Rated'] == False]
+        filtered_data = match_history[match_history['Rated'] != "Rated"]
 
     return filtered_data.to_dict("records")
 
